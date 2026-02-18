@@ -56,8 +56,9 @@ spotplayer/
 │   └── viewer.html           # Split-layout player + transcript
 │
 └── static/
-    ├── css/main.css          # Single flat stylesheet
-    ├── js/upload.js          # Chunked upload client
+    ├── css/main.css          # Single flat stylesheet (dark theme)
+    ├── js/sidebar.js         # Loads project list into sidebar via /api/projects
+    ├── js/upload.js          # Chunked upload client with step indicator + progress
     └── js/viewer.js          # timeupdate listener + binary-search cue highlight
 ```
 

@@ -7,23 +7,61 @@
   <link rel="stylesheet" href="/static/css/main.css">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if project_id %} data-project-id="{{ project_id }}"{% endif %}>
 
-<nav class="navbar">
-  <a class="navbar-brand" href="/">SpotPlayer</a>
-  <div class="navbar-links">
-    {% block nav_links %}
-    <a href="/upload">Upload</a>
-    <form method="post" action="/logout" style="display:inline">
-      <button type="submit" class="btn-link">Sign out</button>
-    </form>
-    {% endblock %}
-  </div>
-</nav>
+<div class="app-shell">
 
-<main>
-  {% block content %}{% endblock %}
-</main>
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Brand -->
+    <a href="/" class="sidebar-brand">
+      <div class="sidebar-brand-icon">S</div>
+      <span class="sidebar-brand-name">SpotPlayer</span>
+    </a>
+
+    <!-- Static navigation -->
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item {% if active_nav == 'home' %}active{% endif %}">
+        <span class="nav-item-icon">⊞</span> All projects
+      </a>
+    </nav>
+
+    <!-- New project button -->
+    <a href="/upload" class="sidebar-new-btn {% if active_nav == 'upload' %}active{% endif %}">
+      + New project
+    </a>
+
+    <!-- Project list (populated by sidebar.js) -->
+    <div class="sidebar-section-label">Projects</div>
+    <div class="sidebar-projects">
+      <div id="sidebar-project-list">
+        <!-- Loading placeholder -->
+        <p class="sidebar-empty">Loading…</p>
+      </div>
+    </div>
+
+    <!-- Footer / sign out -->
+    <div class="sidebar-footer">
+      <form method="post" action="/logout">
+        <button type="submit" class="sidebar-signout">
+          ↪ Sign out
+        </button>
+      </form>
+    </div>
+
+  </aside>
+
+  <!-- ── Main content ─────────────────────────────────────── -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+
+<!-- Sidebar project list loader (on every page that uses this base) -->
+<script src="/static/js/sidebar.js"></script>
+{% block scripts %}{% endblock %}
 
 </body>
 </html>

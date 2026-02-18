@@ -4,94 +4,117 @@
 
 {% block content %}
 <div class="page-header">
-  <h2>Projects</h2>
-  <a href="/upload" class="btn btn-primary">+ Upload new</a>
+  <div>
+    <h1 class="page-title">Projects</h1>
+    <p class="page-subtitle">Click a project to open the viewer, or upload a new one.</p>
+  </div>
+  <a href="/upload" class="btn btn-primary">+ New project</a>
 </div>
 
-{% if not projects %}
-<div class="empty-state">
-  <p>No projects yet.</p>
-  <a href="/upload" class="btn btn-primary">Upload your first interview</a>
-</div>
-{% else %}
 <div class="project-grid">
-  {% for p in projects %}
-  <div class="project-card" data-project-id="{{ p.id }}" data-status="{{ p.processing_status }}">
+  {% if not projects %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🎬</div>
+    <div class="empty-state-title">No projects yet</div>
+    <div class="empty-state-desc">Upload a video and subtitle file to get started.</div>
+    <a href="/upload" class="btn btn-primary">Upload first project</a>
+  </div>
+  {% endif %}
 
-    <!-- Thumbnail area -->
-    <div class="project-thumb">
+  {% for p in projects %}
+  {% if p.processing_status == 'ready' %}
+  <a class="project-card" href="/project/{{ p.id }}">
+  {% else %}
+  <div class="project-card" style="cursor:default" data-project-id="{{ p.id }}" data-status="{{ p.processing_status }}">
+  {% endif %}
+
+    <div class="project-thumb-wrap">
       {% if p.processing_status == 'ready' %}
-        <a href="/project/{{ p.id }}">
-          <img
-            src="/api/media/thumbnail/{{ p.id }}"
-            alt="Thumbnail for {{ p.title }}"
-            loading="lazy"
-            onerror="this.style.display='none'"
-          >
-        </a>
+        <img class="project-thumb"
+             src="/api/media/thumbnail/{{ p.id }}"
+             alt="Thumbnail"
+             loading="lazy"
+             onerror="this.parentElement.innerHTML='<div class=\'project-thumb-placeholder\'><span style=\'font-size:1.5rem;opacity:.3\'>🎬</span></div>'">
       {% elif p.processing_status == 'error' %}
-        <div class="thumb-placeholder thumb-error">
-          <span>Error</span>
+        <div class="project-thumb-placeholder">
+          <span style="font-size:1.2rem;color:var(--danger)">⚠</span>
+          <span style="font-size:.75rem;color:var(--danger)">Processing failed</span>
+          <button class="btn btn-sm btn-primary retry-btn"
+                  data-project-id="{{ p.id }}"
+                  style="margin-top:.35rem">
+            Retry
+          </button>
         </div>
       {% else %}
-        <!-- pending or processing — show spinner, JS will poll for updates -->
-        <div class="thumb-placeholder thumb-processing">
+        <div class="project-thumb-placeholder">
           <div class="spinner"></div>
+          <span style="font-size:.75rem">Processing…</span>
         </div>
       {% endif %}
     </div>
 
-    <!-- Project metadata -->
-    <div class="project-info">
-      <div class="project-title">
-        {% if p.processing_status == 'ready' %}
-          <a href="/project/{{ p.id }}">{{ p.title }}</a>
-        {% else %}
-          {{ p.title }}
-        {% endif %}
-      </div>
-      <div class="project-meta">
+    <div class="project-card-body">
+      <div class="project-card-title">{{ p.title }}</div>
+      <div class="project-card-meta">
         <span class="project-date">{{ p.upload_timestamp[:10] }}</span>
-        <span class="status-badge status-{{ p.processing_status }}">{{ p.processing_status }}</span>
+        <span class="badge badge-{{ p.processing_status }}">{{ p.processing_status }}</span>
       </div>
     </div>
 
+  {% if p.processing_status == 'ready' %}
+  </a>
+  {% else %}
   </div>
+  {% endif %}
   {% endfor %}
 </div>
-{% endif %}
 
 <script>
-// Poll processing_status for any card that is not yet ready or error.
-// On each poll cycle, if the status changed to 'ready', reload the page.
 (function () {
-  const POLL_MS = 3000;
-
-  const pendingCards = Array.from(
-    document.querySelectorAll('.project-card[data-status="pending"], .project-card[data-status="processing"]')
+  // Poll any in-progress cards and reload when they finish.
+  const processingCards = Array.from(
+    document.querySelectorAll('[data-status="pending"],[data-status="processing"]')
   );
-
-  if (pendingCards.length === 0) return;
-
-  async function pollOne(card) {
-    const id = card.dataset.projectId;
-    try {
-      const res = await fetch(`/api/project/${id}/status`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.status === 'ready' || data.status === 'error') {
-        // Status changed — reload the whole page to show the thumbnail.
-        window.location.reload();
+  if (processingCards.length) {
+    async function poll() {
+      for (const card of processingCards) {
+        try {
+          const r = await fetch(`/api/project/${card.dataset.projectId}/status`);
+          if (!r.ok) continue;
+          const { status } = await r.json();
+          if (status === 'ready' || status === 'error') { location.reload(); return; }
+        } catch (_) {}
       }
-    } catch (_) { /* network error — will retry */ }
+    }
+    setInterval(poll, 4000);
   }
 
-  function pollAll() {
-    pendingCards.forEach(pollOne);
-  }
-
-  setInterval(pollAll, POLL_MS);
-  pollAll(); // first poll immediately
+  // Retry buttons on error cards.
+  document.querySelectorAll('.retry-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.projectId;
+      btn.disabled = true;
+      btn.textContent = 'Queuing…';
+      try {
+        const r = await fetch(`/api/project/${id}/reprocess`, { method: 'POST' });
+        if (r.ok) {
+          // Reload so the card switches to the processing spinner.
+          location.reload();
+        } else {
+          const j = await r.json().catch(() => ({}));
+          alert('Could not retry: ' + (j.detail || r.status));
+          btn.disabled = false;
+          btn.textContent = 'Retry';
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+      }
+    });
+  });
 })();
 </script>
 {% endblock %}

@@ -1,139 +1,178 @@
 /**
  * upload.js — chunked video upload client
  *
- * Flow:
- *  1. User submits the form.
- *  2. POST /api/upload/init  (title + SRT + chunk count) → {upload_id, project_id}
- *  3. Split video file into CHUNK_SIZE_BYTES slices.
- *  4. Upload each slice sequentially to POST /api/upload/chunk.
- *  5. POST /api/upload/finalize → server queues background processing.
- *  6. Show success message.
+ * The form's submit event is intercepted here. Files are split into 50 MB
+ * chunks and POSTed one at a time to /api/upload/chunk.
  *
- * Chunks are uploaded sequentially (not in parallel) to avoid saturating the
- * connection and to make progress reporting straightforward.
+ * Bug-prevention notes:
+ *   - This script is loaded at the bottom of <body> (no defer/DOMContentLoaded
+ *     needed — the DOM is already fully parsed by the time this runs).
+ *   - The <form> has method="post" so that if JS fails the browser sends a
+ *     POST (giving a visible server error) instead of a silent GET.
  */
 
 "use strict";
 
-// Maximum bytes per chunk — must stay under Cloudflare's 100 MB request limit.
-const CHUNK_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+const CHUNK_BYTES = 50 * 1024 * 1024;  // 50 MB per chunk
 
-// --- DOM references (set up after DOMContentLoaded) -----------------------
-let form, uploadBtn, errorBox, progressSection, progressLabel, progressBar,
-    progressDetail, successSection;
+// DOM refs — elements guaranteed present on this page.
+const form            = document.getElementById("upload-form");
+const uploadBtn       = document.getElementById("upload-btn");
+const errorBox        = document.getElementById("upload-error");
+const progressSection = document.getElementById("upload-progress");
+const progressMsg     = document.getElementById("progress-message");
+const progressFill    = document.getElementById("progress-fill");
+const progressLeft    = document.getElementById("progress-left");
+const progressRight   = document.getElementById("progress-right");
+const successSection  = document.getElementById("upload-success");
 
-document.addEventListener("DOMContentLoaded", () => {
-  form            = document.getElementById("upload-form");
-  uploadBtn       = document.getElementById("upload-btn");
-  errorBox        = document.getElementById("upload-error");
-  progressSection = document.getElementById("upload-progress");
-  progressLabel   = document.getElementById("progress-label");
-  progressBar     = document.getElementById("progress-bar");
-  progressDetail  = document.getElementById("progress-detail");
-  successSection  = document.getElementById("upload-success");
+// Step indicator dots.
+const steps = {
+  init:     document.getElementById("step-init"),
+  upload:   document.getElementById("step-upload"),
+  finalize: document.getElementById("step-finalize"),
+};
 
-  form.addEventListener("submit", handleSubmit);
-});
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-// ---------------------------------------------------------------------------
-
-function showError(message) {
-  errorBox.textContent = message;
-  errorBox.style.display = "block";
-  uploadBtn.disabled = false;
-  uploadBtn.textContent = "Start upload";
+function setStep(name) {
+  const order = ["init", "upload", "finalize"];
+  const idx = order.indexOf(name);
+  order.forEach((s, i) => {
+    const el = steps[s];
+    if (!el) return;
+    el.classList.toggle("active", i === idx);
+    el.classList.toggle("done",   i < idx);
+  });
 }
 
-function setProgress(numerator, denominator, label) {
-  const pct = denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
-  progressBar.style.width = pct + "%";
-  progressDetail.textContent = label || `${numerator} / ${denominator} chunks`;
-  if (progressLabel && label) progressLabel.textContent = label;
+function setProgress(pct, message, left, right) {
+  progressFill.style.width = Math.min(100, pct) + "%";
+  if (message)      progressMsg.textContent   = message;
+  if (left != null) progressLeft.textContent  = left;
+  if (right != null) progressRight.textContent = right;
 }
 
-/** Upload a single FormData payload and return the parsed JSON response. */
-async function postForm(url, formData) {
-  const res = await fetch(url, { method: "POST", body: formData });
-  const json = await res.json().catch(() => ({}));
+function showError(msg) {
+  errorBox.textContent    = msg;
+  errorBox.style.display  = "block";
+  uploadBtn.disabled      = false;
+  uploadBtn.textContent   = "Start upload";
+  form.style.display      = "block";
+  progressSection.style.display = "none";
+}
+
+function formatBytes(b) {
+  if (b < 1024)       return b + " B";
+  if (b < 1048576)    return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+
+/** POST a FormData payload and return parsed JSON; throws on HTTP error. */
+async function postForm(url, data) {
+  const res = await fetch(url, { method: "POST", body: data });
+  let json;
+  try   { json = await res.json(); }
+  catch { json = {}; }
   if (!res.ok) {
-    throw new Error(json.detail || `Server returned ${res.status}`);
+    throw new Error(json.detail || `Server error ${res.status}`);
   }
   return json;
 }
 
-// ---------------------------------------------------------------------------
+// ── Main upload handler ───────────────────────────────────────────────────────
 
 async function handleSubmit(e) {
   e.preventDefault();
 
+  const title     = document.getElementById("project-title").value.trim();
+  const srtFile   = document.getElementById("srt-file").files[0];
+  const videoFile = document.getElementById("video-file").files[0];
+
   errorBox.style.display = "none";
-  uploadBtn.disabled = true;
-  uploadBtn.textContent = "Uploading…";
 
-  const title      = document.getElementById("project-title").value.trim();
-  const srtFile    = document.getElementById("srt-file").files[0];
-  const videoFile  = document.getElementById("video-file").files[0];
-
-  // Basic client-side validation.
   if (!title)     return showError("Please enter a project title.");
   if (!srtFile)   return showError("Please select an SRT subtitle file.");
   if (!videoFile) return showError("Please select a video file.");
 
-  // Calculate how many chunks we'll need.
-  const totalChunks = Math.max(1, Math.ceil(videoFile.size / CHUNK_SIZE_BYTES));
-
-  // Show progress UI.
-  form.style.display = "none";
+  uploadBtn.disabled    = true;
+  uploadBtn.textContent = "Uploading…";
+  form.style.display    = "none";
   progressSection.style.display = "block";
-  progressLabel.textContent = "Initialising…";
-  setProgress(0, totalChunks, "Initialising…");
+
+  const totalChunks = Math.max(1, Math.ceil(videoFile.size / CHUNK_BYTES));
+  const totalSize   = videoFile.size;
 
   try {
-    // --- Step 1: init -------------------------------------------------------
-    const initForm = new FormData();
-    initForm.append("title",          title);
-    initForm.append("srt_file",       srtFile, srtFile.name);
-    initForm.append("total_chunks",   String(totalChunks));
-    initForm.append("video_filename", videoFile.name);
+    // ── Step 1: init ───────────────────────────────────────────────────────
+    setStep("init");
+    setProgress(2, "Initialising upload…", "Sending metadata + subtitle file", "");
 
-    const { upload_id: uploadId, project_id: projectId } =
-      await postForm("/api/upload/init", initForm);
+    const initData = new FormData();
+    initData.append("title",          title);
+    initData.append("srt_file",       srtFile, srtFile.name);
+    initData.append("total_chunks",   String(totalChunks));
+    initData.append("video_filename", videoFile.name);
 
-    // --- Step 2: upload chunks ---------------------------------------------
-    progressLabel.textContent = "Uploading video…";
+    const { upload_id: uploadId } = await postForm("/api/upload/init", initData);
+
+    // ── Step 2: upload chunks ──────────────────────────────────────────────
+    setStep("upload");
+    let uploadedBytes = 0;
+    const startTime   = Date.now();
 
     for (let i = 0; i < totalChunks; i++) {
-      const start  = i * CHUNK_SIZE_BYTES;
-      const end    = Math.min(start + CHUNK_SIZE_BYTES, videoFile.size);
-      const slice  = videoFile.slice(start, end);
+      const start = i * CHUNK_BYTES;
+      const end   = Math.min(start + CHUNK_BYTES, totalSize);
+      const slice = videoFile.slice(start, end);
 
-      const chunkForm = new FormData();
-      chunkForm.append("upload_id",    uploadId);
-      chunkForm.append("chunk_index",  String(i));
-      chunkForm.append("chunk",        slice, `chunk_${i}`);
+      const fd = new FormData();
+      fd.append("upload_id",   uploadId);
+      fd.append("chunk_index", String(i));
+      fd.append("chunk",       slice, `chunk_${i}`);
 
-      await postForm("/api/upload/chunk", chunkForm);
-      setProgress(i + 1, totalChunks, `Uploading chunk ${i + 1} of ${totalChunks}…`);
+      await postForm("/api/upload/chunk", fd);
+
+      uploadedBytes += (end - start);
+      const pct      = (uploadedBytes / totalSize) * 100;
+      const elapsed  = (Date.now() - startTime) / 1000;
+      const speed    = elapsed > 0 ? uploadedBytes / elapsed : 0;
+      const remaining = speed > 0 ? ((totalSize - uploadedBytes) / speed) : 0;
+
+      setProgress(
+        pct,
+        `Uploading chunk ${i + 1} of ${totalChunks}…`,
+        `${formatBytes(uploadedBytes)} of ${formatBytes(totalSize)}`,
+        remaining > 1 ? `~${Math.ceil(remaining)}s remaining` : ""
+      );
     }
 
-    // --- Step 3: finalize --------------------------------------------------
-    progressLabel.textContent = "Finalising…";
-    setProgress(totalChunks, totalChunks, "Finalising upload…");
+    // ── Step 3: finalize ───────────────────────────────────────────────────
+    setStep("finalize");
+    setProgress(98, "Finalising — assembling chunks on server…", "", "");
 
-    const finalForm = new FormData();
-    finalForm.append("upload_id",      uploadId);
-    finalForm.append("video_filename", videoFile.name);
+    const finalData = new FormData();
+    finalData.append("upload_id",      uploadId);
+    finalData.append("video_filename", videoFile.name);
 
-    await postForm("/api/upload/finalize", finalForm);
+    await postForm("/api/upload/finalize", finalData);
 
-    // --- Done --------------------------------------------------------------
+    setProgress(100, "Upload complete!", "Video processing started in background", "");
+
+    // Brief pause so the user sees 100%, then show the success banner.
+    await new Promise(r => setTimeout(r, 600));
     progressSection.style.display = "none";
     successSection.style.display  = "block";
 
   } catch (err) {
-    // Re-show the form so the user can correct the issue.
-    progressSection.style.display = "none";
-    form.style.display = "block";
     showError(err.message || "An unexpected error occurred. Please try again.");
   }
+}
+
+// Attach listener directly — no DOMContentLoaded wrapper needed because this
+// script is included at the bottom of <body>.
+if (form) {
+  form.addEventListener("submit", handleSubmit);
+} else {
+  console.error("SpotPlayer: #upload-form not found — upload.js loaded on wrong page?");
 }
