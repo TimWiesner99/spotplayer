@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Upload — SpotPlayer{% endblock %}
+
+{% block head %}
+<script src="/static/js/upload.js" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+  <h2>Upload interview footage</h2>
+  <p class="upload-hint">
+    Supported video formats: MP4, MKV, MOV, AVI, WebM.<br>
+    The video will be automatically transcoded to H.264 MP4 if needed.
+  </p>
+
+  <!-- Step 1 form — visible initially -->
+  <form id="upload-form" novalidate>
+
+    <div class="form-group">
+      <label for="project-title">Project title</label>
+      <input
+        type="text"
+        id="project-title"
+        name="title"
+        class="form-control"
+        placeholder="e.g. Interview with Jane Doe — 2025-01-15"
+        required
+        maxlength="200"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="srt-file">Subtitle file (.srt)</label>
+      <input
+        type="file"
+        id="srt-file"
+        name="srt_file"
+        class="form-control"
+        accept=".srt"
+        required
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="video-file">Video file</label>
+      <input
+        type="file"
+        id="video-file"
+        name="video_file"
+        class="form-control"
+        accept="video/*"
+        required
+      >
+      <small class="form-hint">Large files are uploaded in 50 MB chunks — progress is shown below.</small>
+    </div>
+
+    <div id="upload-error" class="alert alert-error" style="display:none"></div>
+
+    <button type="submit" id="upload-btn" class="btn btn-primary">
+      Start upload
+    </button>
+
+  </form>
+
+  <!-- Progress section — hidden until upload starts -->
+  <div id="upload-progress" style="display:none">
+    <div class="progress-label" id="progress-label">Uploading…</div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div class="progress-detail" id="progress-detail"></div>
+  </div>
+
+  <!-- Success message — hidden until done -->
+  <div id="upload-success" style="display:none" class="alert alert-success">
+    Upload complete! The video is now being processed.
+    <a href="/" class="btn btn-primary" style="margin-left:1rem">Back to projects</a>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SpotPlayer{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="navbar-brand" href="/">SpotPlayer</a>
+  <div class="navbar-links">
+    {% block nav_links %}
+    <a href="/upload">Upload</a>
+    <form method="post" action="/logout" style="display:inline">
+      <button type="submit" class="btn-link">Sign out</button>
+    </form>
+    {% endblock %}
+  </div>
+</nav>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+</body>
+</html>

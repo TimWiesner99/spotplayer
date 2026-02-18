@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Projects — SpotPlayer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Projects</h2>
+  <a href="/upload" class="btn btn-primary">+ Upload new</a>
+</div>
+
+{% if not projects %}
+<div class="empty-state">
+  <p>No projects yet.</p>
+  <a href="/upload" class="btn btn-primary">Upload your first interview</a>
+</div>
+{% else %}
+<div class="project-grid">
+  {% for p in projects %}
+  <div class="project-card" data-project-id="{{ p.id }}" data-status="{{ p.processing_status }}">
+
+    <!-- Thumbnail area -->
+    <div class="project-thumb">
+      {% if p.processing_status == 'ready' %}
+        <a href="/project/{{ p.id }}">
+          <img
+            src="/api/media/thumbnail/{{ p.id }}"
+            alt="Thumbnail for {{ p.title }}"
+            loading="lazy"
+            onerror="this.style.display='none'"
+          >
+        </a>
+      {% elif p.processing_status == 'error' %}
+        <div class="thumb-placeholder thumb-error">
+          <span>Error</span>
+        </div>
+      {% else %}
+        <!-- pending or processing — show spinner, JS will poll for updates -->
+        <div class="thumb-placeholder thumb-processing">
+          <div class="spinner"></div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Project metadata -->
+    <div class="project-info">
+      <div class="project-title">
+        {% if p.processing_status == 'ready' %}
+          <a href="/project/{{ p.id }}">{{ p.title }}</a>
+        {% else %}
+          {{ p.title }}
+        {% endif %}
+      </div>
+      <div class="project-meta">
+        <span class="project-date">{{ p.upload_timestamp[:10] }}</span>
+        <span class="status-badge status-{{ p.processing_status }}">{{ p.processing_status }}</span>
+      </div>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+// Poll processing_status for any card that is not yet ready or error.
+// On each poll cycle, if the status changed to 'ready', reload the page.
+(function () {
+  const POLL_MS = 3000;
+
+  const pendingCards = Array.from(
+    document.querySelectorAll('.project-card[data-status="pending"], .project-card[data-status="processing"]')
+  );
+
+  if (pendingCards.length === 0) return;
+
+  async function pollOne(card) {
+    const id = card.dataset.projectId;
+    try {
+      const res = await fetch(`/api/project/${id}/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.status === 'ready' || data.status === 'error') {
+        // Status changed — reload the whole page to show the thumbnail.
+        window.location.reload();
+      }
+    } catch (_) { /* network error — will retry */ }
+  }
+
+  function pollAll() {
+    pendingCards.forEach(pollOne);
+  }
+
+  setInterval(pollAll, POLL_MS);
+  pollAll(); // first poll immediately
+})();
+</script>
+{% endblock %}

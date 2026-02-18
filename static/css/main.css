@@ -1,0 +1,450 @@
+/* ============================================================
+   SpotPlayer — main stylesheet
+   Single flat file; no preprocessor needed at this scale.
+   ============================================================ */
+
+/* ── Reset & base ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #f0f2f5;
+  --surface:      #ffffff;
+  --border:       #dee2e6;
+  --text:         #212529;
+  --text-muted:   #6c757d;
+  --primary:      #0d6efd;
+  --primary-dark: #0a58ca;
+  --danger:       #dc3545;
+  --success:      #198754;
+  --highlight:    #fff3cd;   /* active-cue background — warm yellow */
+  --highlight-border: #ffc107;
+  --nav-bg:       #1e2636;
+  --nav-text:     #e2e8f0;
+  --radius:       6px;
+  --shadow:       0 1px 4px rgba(0,0,0,.12);
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Navbar ──────────────────────────────────────────────────── */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  height: 52px;
+  background: var(--nav-bg);
+  color: var(--nav-text);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--nav-text);
+  letter-spacing: .5px;
+}
+.navbar-brand:hover { text-decoration: none; opacity: .85; }
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.navbar-links a {
+  color: var(--nav-text);
+  opacity: .85;
+  font-size: .9rem;
+}
+.navbar-links a:hover { opacity: 1; text-decoration: none; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  padding: .45rem 1.1rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: .9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+  text-decoration: none;
+  line-height: 1.5;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--primary-dark); color: #fff; text-decoration: none; }
+
+.btn-full { width: 100%; text-align: center; }
+
+/* Inline button that looks like a link (used in navbar for logout) */
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--nav-text);
+  cursor: pointer;
+  font-size: .9rem;
+  opacity: .85;
+  padding: 0;
+}
+.btn-link:hover { opacity: 1; }
+
+/* ── Alerts ──────────────────────────────────────────────────── */
+.alert {
+  padding: .75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-size: .9rem;
+}
+.alert-error   { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+.alert-success { background: #d1e7dd; color: #0a3622; border: 1px solid #badbcc; }
+
+/* ── Forms ───────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 1.1rem;
+}
+.form-group label {
+  display: block;
+  margin-bottom: .35rem;
+  font-weight: 500;
+  font-size: .9rem;
+}
+.form-control {
+  display: block;
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .95rem;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color .15s;
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(13,110,253,.15);
+}
+.form-hint {
+  display: block;
+  margin-top: .3rem;
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+
+/* ── Login page ──────────────────────────────────────────────── */
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  padding: 2.5rem 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+}
+.login-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: .2rem;
+}
+.login-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  font-size: .9rem;
+}
+
+/* ── Home page ───────────────────────────────────────────────── */
+main { padding: 1.5rem; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.page-header h2 { font-size: 1.35rem; }
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--text-muted);
+}
+.empty-state p { margin-bottom: 1rem; }
+
+/* Project grid */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.project-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: box-shadow .2s;
+}
+.project-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+
+.project-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #e9ecef;
+  overflow: hidden;
+}
+.project-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+.thumb-error   { background: #f8d7da; color: var(--danger); }
+.thumb-processing { background: #e9ecef; }
+
+.project-info {
+  padding: .85rem;
+}
+.project-title {
+  font-weight: 600;
+  font-size: .95rem;
+  margin-bottom: .35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+
+/* Status badges */
+.status-badge {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .15rem .5rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.status-ready      { background: #d1e7dd; color: #0a3622; }
+.status-processing { background: #cfe2ff; color: #0842a0; }
+.status-pending    { background: #e9ecef; color: #495057; }
+.status-error      { background: #f8d7da; color: #842029; }
+
+/* ── Upload page ─────────────────────────────────────────────── */
+.upload-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--surface);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.upload-container h2 { margin-bottom: .5rem; }
+.upload-hint {
+  color: var(--text-muted);
+  font-size: .875rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+/* Progress bar */
+.progress-label {
+  font-size: .9rem;
+  margin-bottom: .5rem;
+  font-weight: 500;
+}
+.progress-bar-track {
+  height: 10px;
+  background: #e9ecef;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: .4rem;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+.progress-detail {
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+
+/* ── Spinner ─────────────────────────────────────────────────── */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #dee2e6;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+.spinner-lg { width: 42px; height: 42px; border-width: 4px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Viewer layout ───────────────────────────────────────────── */
+
+/* Override main padding for the viewer so it fills the viewport */
+.viewer-layout {
+  display: flex;
+  height: calc(100vh - 52px);  /* full height minus navbar */
+  overflow: hidden;
+}
+
+/* Viewer is a direct child of <main>, so reset main's padding for it */
+body:has(.viewer-layout) main {
+  padding: 0;
+}
+
+/* ── Video panel (left) ──────────────────────────────────── */
+.viewer-left {
+  flex: 0 0 58%;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  padding: 0;
+}
+
+.video-title {
+  padding: .6rem 1rem;
+  background: #1a1f2e;
+  color: #e2e8f0;
+  font-size: .9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+#video-player {
+  width: 100%;
+  flex: 1;
+  background: #000;
+  display: block;
+  max-height: calc(100% - 38px);  /* leave room for title bar */
+  object-fit: contain;
+}
+
+.video-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #adb5bd;
+  background: #0d111c;
+  text-align: center;
+  padding: 2rem;
+}
+.processing-hint { font-size: .82rem; color: #6c757d; }
+
+/* ── Transcript panel (right) ────────────────────────────── */
+.viewer-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.transcript-header {
+  padding: .7rem 1.1rem;
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.transcript-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.4rem;
+  font-size: .95rem;
+  line-height: 1.85;
+  color: var(--text);
+}
+
+/* ── Cue spans ───────────────────────────────────────────── */
+.cue {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 1px 0;
+  transition: background .1s;
+}
+.cue:hover {
+  background: #e9ecef;
+}
+/* Active cue: highlighted while video plays over it */
+.cue.active {
+  background: var(--highlight);
+  outline: 1px solid var(--highlight-border);
+}
+
+.no-transcript {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Responsive tweaks ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .viewer-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .viewer-left {
+    flex: none;
+  }
+  #video-player {
+    max-height: 40vh;
+  }
+  .viewer-right {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    height: 50vh;
+  }
+}

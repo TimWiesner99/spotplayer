@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.title }} — SpotPlayer{% endblock %}
+
+{% block head %}
+<script src="/static/js/viewer.js" defer></script>
+{% endblock %}
+
+{% block nav_links %}
+<a href="/">← All projects</a>
+<form method="post" action="/logout" style="display:inline">
+  <button type="submit" class="btn-link">Sign out</button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="viewer-layout">
+
+  <!-- ── Left panel: video player ───────────────────────────────────────── -->
+  <div class="viewer-left">
+    <div class="video-title">{{ project.title }}</div>
+
+    {% if project.processing_status == 'ready' %}
+      <video
+        id="video-player"
+        controls
+        preload="metadata"
+        src="/api/media/video/{{ project.id }}"
+      ></video>
+    {% elif project.processing_status == 'error' %}
+      <div class="video-placeholder">
+        <p>Processing failed for this project.</p>
+      </div>
+    {% else %}
+      <div class="video-placeholder" id="processing-placeholder">
+        <div class="spinner spinner-lg"></div>
+        <p>Video is being processed…</p>
+        <p class="processing-hint">This page will refresh automatically when it's ready.</p>
+      </div>
+      <script>
+        // Poll for completion and reload when ready.
+        (function () {
+          const projectId = {{ project.id }};
+          async function poll() {
+            try {
+              const res = await fetch(`/api/project/${projectId}/status`);
+              if (!res.ok) return;
+              const data = await res.json();
+              if (data.status === 'ready' || data.status === 'error') {
+                window.location.reload();
+              }
+            } catch (_) {}
+          }
+          setInterval(poll, 3000);
+        })();
+      </script>
+    {% endif %}
+  </div>
+
+  <!-- ── Right panel: transcript ────────────────────────────────────────── -->
+  <div class="viewer-right">
+    <div class="transcript-header">Transcript</div>
+    <div class="transcript-panel" id="transcript-panel">
+
+      {% if cues %}
+        {#
+          Render each cue as an inline <span> so the text flows as prose.
+          data-start and data-end are in seconds (float) so viewer.js can
+          compare them directly against video.currentTime.
+          A single space text node is added between spans to keep word spacing.
+        #}
+        {% for cue in cues %}
+        <span
+          class="cue"
+          data-start="{{ cue.start_time }}"
+          data-end="{{ cue.end_time }}"
+          data-index="{{ cue.index_num }}"
+        >{{ cue.text }}</span>{% if not loop.last %} {% endif %}
+        {% endfor %}
+      {% else %}
+        <p class="no-transcript">No transcript available for this project.</p>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
